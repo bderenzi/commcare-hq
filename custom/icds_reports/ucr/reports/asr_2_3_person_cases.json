@@ -94,6 +94,27 @@
           "type": "location"
         },
         "display": "Filter by State"
+      },
+      {
+        "type": "derived",
+        "field": "derived_state_id",
+        "slug": "derived_state_id",
+        "datatype": "string",
+        "expression": {
+          "type": "ancestor_location",
+          "location_id": {
+            "type": "coalesce",
+            "expression": {
+              "type": "from_filter",
+              "from_filter": "supervisor_id"
+            },
+            "default_expression": {
+              "type": "from_filter",
+              "from_filter": "block_id"
+            }
+          },
+          "location_type": "state"
+        }
       }
     ],
     "columns": [
