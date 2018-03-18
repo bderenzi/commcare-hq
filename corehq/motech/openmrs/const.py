@@ -16,3 +16,6 @@ IMPORT_FREQUENCY_CHOICES = (
     (IMPORT_FREQUENCY_WEEKLY, _('Weekly')),
     (IMPORT_FREQUENCY_MONTHLY, _('Monthly')),
 )
+
+# The Location property to store the OpenMRS location UUID in:
+LOCATION_OPENMRS_UUID = 'openmrs_uuid'

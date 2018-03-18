@@ -1,5 +1,10 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
+
+from corehq.apps.locations.models import SQLLocation
+from corehq.apps.users.cases import get_owner_id, get_wrapped_owner
+from corehq.form_processor.interfaces.dbaccessors import CaseAccessors
+from corehq.motech.openmrs.const import LOCATION_OPENMRS_UUID
 from corehq.motech.openmrs.logger import logger
 from corehq.motech.openmrs.repeater_helpers import (
     CaseTriggerInfo,
@@ -104,12 +109,25 @@ class CreateVisitsTask(WorkflowTask):
     def __init__(self, *args, **kwargs):
         super(CreateVisitsTask, self).__init__(None, None, None, *args, **kwargs)
 
-    def run(self, requests, info, form_json, form_question_values, openmrs_config, person_uuid):
+    def _get_openmrs_location_uuid(self, domain, case_id):
+        case = CaseAccessors(domain).get_case(case_id)
+        case_owner = get_wrapped_owner(get_owner_id(case))
+        if isinstance(case_owner, SQLLocation):
+            location = case_owner
+        else:
+            location_id = case_owner.get_location_id(domain)
+            location = SQLLocation.by_location_id(location_id) if location_id else None
+        if location:
+            return location.metadata.get(LOCATION_OPENMRS_UUID)
+        return None
+
+    def run(self, requests, domain, info, form_json, form_question_values, openmrs_config, person_uuid):
         """
         This task does not make any changes itself. It uses subtasks for creating visits, encounters and
         observations
         """
         provider_uuid = getattr(openmrs_config, 'openmrs_provider', None)
+        location_uuid = self._get_openmrs_location_uuid(domain, info.case_id)
         info.form_question_values.update(form_question_values)
         for form_config in openmrs_config.form_configs:
             logger.debug('Send visit for form?', form_config, form_json)
@@ -132,8 +150,7 @@ class CreateVisitsTask(WorkflowTask):
                         encounter_type=form_config.openmrs_encounter_type,
                         openmrs_form=form_config.openmrs_form,
                         visit_type=form_config.openmrs_visit_type,
-                        # TODO: Set location = location of case owner (CHW)
-                        # location_uuid=location[meta][openmrs_uuid]
+                        location_uuid=location_uuid
                     )
                 )
 
@@ -192,5 +209,5 @@ class SyncOpenmrsPatientTask(WorkflowTask):
         self._subtasks.extend([
             SyncPersonAttrsTask(requests, info, openmrs_config, person_uuid, patient['person']['attributes']),
 
-            CreateVisitsTask(requests, info, form_json, form_question_values, openmrs_config, person_uuid)
+            CreateVisitsTask(requests, domain, info, form_json, form_question_values, openmrs_config, person_uuid)
         ])
