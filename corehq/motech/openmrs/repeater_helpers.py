@@ -10,6 +10,7 @@ from six.moves import zip
 
 from casexml.apps.case.xform import extract_case_blocks
 from corehq.form_processor.interfaces.dbaccessors import CaseAccessors
+from corehq.motech.openmrs.const import PERSON_UUID_IDENTIFIER_TYPE_ID
 from corehq.motech.openmrs.finders import PatientFinder
 from corehq.motech.openmrs.logger import logger
 from corehq.motech.openmrs.workflow import WorkflowTask, task
@@ -55,10 +56,6 @@ ADDRESS_PROPERTIES = (
     'startDate',
     'endDate',
 )
-# To match cases against their OpenMRS Person UUID, set the IdMatcher's identifier_type_id to the value of
-# PERSON_UUID_IDENTIFIER_TYPE_ID. To match against any other OpenMRS identifier, set the IdMatcher's
-# identifier_type_id to the UUID of the OpenMRS Identifier Type.
-PERSON_UUID_IDENTIFIER_TYPE_ID = 'uuid'
 
 
 OpenmrsResponse = namedtuple('OpenmrsResponse', 'status_code reason content')

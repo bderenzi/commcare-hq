@@ -7,6 +7,7 @@ from pprint import pformat
 
 from jsonpath_rw import Child, parse, Fields, Slice
 
+from corehq.motech.openmrs.const import PERSON_UUID_IDENTIFIER_TYPE_ID
 from corehq.motech.openmrs.jsonpath import WhereCmp
 from dimagi.ext.couchdbkit import (
     DecimalProperty,
@@ -211,7 +212,6 @@ class WeightedPropertyPatientFinder(PatientFinder):
         """
         from casexml.apps.case.mock import CaseBlock
         from corehq.apps.hqcase.utils import submit_case_blocks
-        from corehq.motech.openmrs.repeater_helpers import PERSON_UUID_IDENTIFIER_TYPE_ID
 
         case_config_ids = case_config['patient_identifiers']
         case_update = {}
