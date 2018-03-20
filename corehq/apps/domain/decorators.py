@@ -1,5 +1,6 @@
 # Standard Library imports
 from __future__ import absolute_import
+from __future__ import unicode_literals
 from functools import wraps
 import logging
 from base64 import b64decode
@@ -109,13 +110,13 @@ def login_and_domain_required(view_func):
                 elif domain.is_snapshot:
                     # snapshots are publicly viewable
                     return require_previewer(view_func)(req, domain_name, *args, **kwargs)
-                elif domain.allow_domain_requests:
+                elif couch_user.is_web_user() and domain.allow_domain_requests:
                     from corehq.apps.users.views import DomainRequestView
                     return DomainRequestView.as_view()(req, *args, **kwargs)
                 else:
                     raise Http404
             elif (
-                req.path.startswith(u'/a/{}/reports/custom'.format(domain_name)) and
+                req.path.startswith('/a/{}/reports/custom'.format(domain_name)) and
                 PUBLISH_CUSTOM_REPORTS.enabled(domain_name)
             ):
                 return view_func(req, domain_name, *args, **kwargs)
@@ -280,10 +281,14 @@ def two_factor_check(api_key):
             dom = Domain.get_by_name(domain)
             if not api_key and dom and dom.two_factor_auth:
                 token = request.META.get('HTTP_X_COMMCAREHQ_OTP')
-                if token and match_token(request.user, token):
-                    return fn(request, *args, **kwargs)
-                else:
+
+                if not token:
                     return JsonResponse({"error": "must send X-CommcareHQ-OTP header"}, status=401)
+                elif not match_token(request.user, token):
+                    return JsonResponse({"error": "X-CommcareHQ-OTP token is incorrect"}, status=401)
+                else:
+                    return fn(request, domain, *args, **kwargs)
+
             return fn(request, domain, *args, **kwargs)
         return _inner
     return _outer

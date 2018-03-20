@@ -42,7 +42,7 @@ from datetime import date, datetime, time, timedelta
 from dateutil.parser import parse
 from dimagi.utils.chunked import chunked
 from dimagi.utils.couch import CriticalSection
-from dimagi.utils.decorators.memoized import memoized
+from memoized import memoized
 from dimagi.utils.logging import notify_exception
 from dimagi.utils.modules import to_function
 from django.conf import settings
@@ -97,7 +97,7 @@ class AutomaticUpdateRule(models.Model):
 
     locked_for_editing = models.BooleanField(default=False)
 
-    class Meta:
+    class Meta(object):
         app_label = "data_interfaces"
 
     class MigrationError(Exception):
@@ -469,7 +469,7 @@ class CaseRuleCriteria(models.Model):
 
 class CaseRuleCriteriaDefinition(models.Model):
 
-    class Meta:
+    class Meta(object):
         abstract = True
 
     def matches(self, case, now):
@@ -644,7 +644,7 @@ class AutomaticUpdateRuleCriteria(models.Model):
     property_value = models.CharField(max_length=126, null=True)
     match_type = models.CharField(max_length=15)
 
-    class Meta:
+    class Meta(object):
         app_label = "data_interfaces"
 
     def get_case_values(self, case):
@@ -800,7 +800,7 @@ class CaseRuleActionResult(object):
 
 class CaseRuleActionDefinition(models.Model):
 
-    class Meta:
+    class Meta(object):
         abstract = True
 
     def when_case_matches(self, case, rule):
@@ -1073,17 +1073,19 @@ class CreateScheduleInstanceActionDefinition(CaseRuleActionDefinition):
     reset_case_property_name = models.CharField(max_length=126, null=True)
 
     # (Optional) The name of a case property which represents the date on which to start
-    # the schedule. If present, this option overrides the start date information in
-    # scheduler_module_info. If no start date information is configured on this
-    # CreateScheduleInstanceActionDefinition, then the date the rule is satisfied will
-    # be used as the start date for the schedule.
+    # the schedule instance.
     # Only applicable when the schedule is a TimedSchedule
     start_date_case_property = models.CharField(max_length=126, null=True)
 
-    # A dict with the structure represented by SchedulerModuleInfo;
-    # when enabled=True in this dict, the framework uses info related to the
-    # specified visit number to set the start date for any schedule instances
-    # created from this CreateScheduleInstanceActionDefinition.
+    # (Optional) A specific date which represents the date on which to start
+    # the schedule instance.
+    # Only applicable when the schedule is a TimedSchedule
+    specific_start_date = models.DateField(null=True)
+
+    # (Optional) A dict with the structure represented by SchedulerModuleInfo.
+    # enabled must be set to True in this dict in order for it to count.
+    # the framework uses info related to the specified visit number to set
+    # the start date for any schedule instances created from this CreateScheduleInstanceActionDefinition.
     # Only applicable when the schedule is a TimedSchedule
     scheduler_module_info = jsonfield.JSONField(default=dict)
 
@@ -1163,22 +1165,35 @@ class CreateScheduleInstanceActionDefinition(CaseRuleActionDefinition):
             kwargs = {}
             scheduler_module_info = self.get_scheduler_module_info()
 
+            # Figure out what to use as the start date of the schedule instance.
+            # Use the information from start_date_case_property, specific_start_date, or
+            # scheduler_module_info. If no start date configuration is provided in
+            # any of those options, then the date the rule is satisfied will be used
+            # as the start date for the schedule instance.
+
             if self.start_date_case_property:
                 start_date = self.get_date_from_start_date_case_property(case)
                 if not start_date:
+                    # The case property doesn't reference a date, so delete any
+                    # schedule instances pertaining to this rule and case and return
                     self.delete_schedule_instances(case)
                     return CaseRuleActionResult()
 
                 kwargs['start_date'] = start_date
+            elif self.specific_start_date:
+                kwargs['start_date'] = self.specific_start_date
             elif scheduler_module_info.enabled:
                 try:
                     case_phase_matches, schedule_instance_start_date = VisitSchedulerIntegrationHelper(case,
                         scheduler_module_info).get_result()
                 except VisitSchedulerIntegrationHelper.VisitSchedulerIntegrationException:
+                    self.delete_schedule_instances(case)
                     self.notify_scheduler_integration_exception(case, scheduler_module_info)
                     return CaseRuleActionResult()
 
                 if not case_phase_matches:
+                    # The case is not in the matching schedule phase, so delete
+                    # schedule instances pertaining to this rule and case and return
                     self.delete_schedule_instances(case)
                     return CaseRuleActionResult()
                 else:
@@ -1237,7 +1252,7 @@ class AutomaticUpdateAction(models.Model):
     property_value_type = models.CharField(max_length=15,
                                            default=EXACT)
 
-    class Meta:
+    class Meta(object):
         app_label = "data_interfaces"
 
 
@@ -1254,7 +1269,7 @@ class CaseRuleSubmission(models.Model):
     # A shortcut to keep track of which forms get archived
     archived = models.BooleanField(default=False)
 
-    class Meta:
+    class Meta(object):
         index_together = (
             ('domain', 'created_on'),
             ('domain', 'rule', 'created_on'),
@@ -1334,7 +1349,7 @@ class DomainCaseRuleRun(models.Model):
     num_related_closes = models.IntegerField(null=True)
     num_creates = models.IntegerField(null=True)
 
-    class Meta:
+    class Meta(object):
         index_together = (
             ('domain', 'started_on'),
         )

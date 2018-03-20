@@ -44,7 +44,7 @@ from corehq.apps.users.landing_pages import get_redirect_url, get_cloudcare_urln
 from corehq.form_processor.utils.general import should_use_sql_backend
 from dimagi.utils.couch.cache.cache_core import get_redis_default_cache
 from dimagi.utils.couch.database import get_db
-from dimagi.utils.decorators.memoized import memoized
+from memoized import memoized
 from dimagi.utils.logging import notify_exception
 from dimagi.utils.parsing import string_to_datetime
 from dimagi.utils.web import get_url_base, json_response, get_site_domain
@@ -430,11 +430,6 @@ class CloudCareLoginView(HQLoginView):
     ]
 
 
-def is_mobile_url(url):
-    # Minor hack
-    return ('reports/custom/mobile' in url)
-
-
 def logout(req):
     referer = req.META.get('HTTP_REFERER')
     domain = get_domain_from_url(urlparse(referer).path) if referer else None
@@ -442,11 +437,7 @@ def logout(req):
     # we don't actually do anything with the response here:
     django_logout(req, **{"template_name": settings.BASE_TEMPLATE})
 
-    if referer and domain and is_mobile_url(referer):
-        mobile_mainnav_url = reverse('custom_project_report_dispatcher', args=[domain, 'mobile/mainnav'])
-        mobile_login_url = reverse('domain_mobile_login', kwargs={'domain': domain})
-        return HttpResponseRedirect('%s?next=%s' % (mobile_login_url, mobile_mainnav_url))
-    elif referer and domain:
+    if referer and domain:
         domain_login_url = reverse('domain_login', kwargs={'domain': domain})
         return HttpResponseRedirect('%s' % domain_login_url)
     else:
